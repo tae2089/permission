@@ -1,0 +1,6 @@
+# Canonical local configuration example.
+serve:
+  address: ":8080"
+database:
+  driver: "sqlite"
+  dsn: "go-template.db"

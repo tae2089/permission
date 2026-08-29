@@ -4,3 +4,5 @@ serve:
 database:
   driver: "sqlite"
   dsn: "go-template.db"
+# Set GO_TEMPLATE_INSTANCE_ADMIN_KEY through a secret manager before running
+# `app serve`. The migrate command does not require this value.

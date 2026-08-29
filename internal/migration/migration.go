@@ -6,8 +6,10 @@ import (
 
 	"github.com/tae2089/trace/v3"
 
+	"github.com/tae2089/go-template/internal/audit"
 	"github.com/tae2089/go-template/internal/config"
 	"github.com/tae2089/go-template/internal/database"
+	"github.com/tae2089/go-template/internal/project"
 	"github.com/tae2089/go-template/internal/user"
 )
 
@@ -21,6 +23,12 @@ func Run(ctx context.Context, cfg config.Config) error {
 	}
 
 	migrateErr := user.Migrate(ctx, connection.DB())
+	if migrateErr == nil {
+		migrateErr = audit.Migrate(ctx, connection.DB())
+	}
+	if migrateErr == nil {
+		migrateErr = project.Migrate(ctx, connection.DB())
+	}
 	if migrateErr != nil {
 		migrateErr = trace.Wrap(migrateErr, "apply database migrations")
 	}

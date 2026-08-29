@@ -8,6 +8,7 @@ import (
 
 	"github.com/tae2089/go-template/internal/health"
 	"github.com/tae2089/go-template/internal/http/middleware"
+	"github.com/tae2089/go-template/internal/project"
 	"github.com/tae2089/go-template/internal/telemetry"
 	"github.com/tae2089/go-template/internal/user"
 )
@@ -17,6 +18,7 @@ func New(
 	telemetryProvider *telemetry.Provider,
 	healthHandler *health.Handler,
 	userHandler *user.Handler,
+	projectHandler *project.Handler,
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(
@@ -32,6 +34,7 @@ func New(
 
 	health.RegisterRoutes(router.Group("/healthz"), healthHandler)
 	user.RegisterRoutes(router.Group("/users"), userHandler)
+	project.RegisterRoutes(router.Group("/v1/projects"), projectHandler)
 
 	return router
 }

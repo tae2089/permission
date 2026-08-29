@@ -34,6 +34,7 @@ func TestConfigValidate(t *testing.T) {
 			cfg := Config{
 				Serve:    Serve{Address: tt.address},
 				Database: Database{Driver: DefaultDatabaseDriver, DSN: DefaultDatabaseDSN},
+				Instance: Instance{AdminKey: "test-instance-admin-key"},
 			}
 
 			err := cfg.Validate()
@@ -57,6 +58,7 @@ func TestConfigValidateRejectsEmptyDatabaseDSN(t *testing.T) {
 	cfg := Config{
 		Serve:    Serve{Address: DefaultServeAddress},
 		Database: Database{Driver: DefaultDatabaseDriver, DSN: "  "},
+		Instance: Instance{AdminKey: "test-instance-admin-key"},
 	}
 
 	err := cfg.Validate()
@@ -85,6 +87,7 @@ func TestConfigValidateRejectsUnsupportedDatabaseDriver(t *testing.T) {
 					Driver: tt.driver,
 					DSN:    DefaultDatabaseDSN,
 				},
+				Instance: Instance{AdminKey: "test-instance-admin-key"},
 			}
 
 			err := cfg.Validate()
@@ -93,6 +96,90 @@ func TestConfigValidateRejectsUnsupportedDatabaseDriver(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), "database.driver") {
 				t.Errorf("Validate() error = %q, want database.driver context", err)
+			}
+		})
+	}
+}
+
+func TestConfigValidateRejectsMissingInstanceAdminKey(t *testing.T) {
+	cfg := Config{
+		Serve:    Serve{Address: DefaultServeAddress},
+		Database: Database{Driver: DefaultDatabaseDriver, DSN: DefaultDatabaseDSN},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() error = nil, want instance.admin_key error")
+	}
+	if !strings.Contains(err.Error(), "instance.admin_key") {
+		t.Errorf("Validate() error = %q, want instance.admin_key context", err)
+	}
+}
+
+func TestLoadInstanceAdminKeyUsesDocumentedPrecedence(t *testing.T) {
+	const envKey = "GO_TEMPLATE_INSTANCE_ADMIN_KEY"
+
+	tests := []struct {
+		name      string
+		overrides map[string]any
+		env       string
+		file      string
+		kv        map[string]any
+		want      string
+	}{
+		{
+			name:      "explicit set overrides every source",
+			overrides: map[string]any{"instance.admin_key": "set-key"},
+			env:       "env-key",
+			file:      "file-key",
+			kv:        instanceConfig("kv-key"),
+			want:      "set-key",
+		},
+		{
+			name: "environment overrides file and lower sources",
+			env:  "env-key",
+			file: "file-key",
+			kv:   instanceConfig("kv-key"),
+			want: "env-key",
+		},
+		{
+			name: "config file overrides kv store and default",
+			file: "file-key",
+			kv:   instanceConfig("kv-key"),
+			want: "file-key",
+		},
+		{
+			name: "kv store overrides default",
+			kv:   instanceConfig("kv-key"),
+			want: "kv-key",
+		},
+		{
+			name: "empty when no source provides a value",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			unsetEnv(t, envKey)
+			if tt.env != "" {
+				t.Setenv(envKey, tt.env)
+			}
+
+			opts := Options{
+				KV:        tt.kv,
+				Overrides: tt.overrides,
+			}
+			if tt.file != "" {
+				opts.ConfigFile = writeInstanceConfig(t, tt.file)
+			}
+
+			got, err := Load(opts)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if got.Instance.AdminKey != tt.want {
+				t.Errorf("Instance.AdminKey did not resolve from the expected source")
 			}
 		})
 	}
@@ -416,6 +503,14 @@ func databaseDriverConfig(driver string) map[string]any {
 	}
 }
 
+func instanceConfig(adminKey string) map[string]any {
+	return map[string]any{
+		"instance": map[string]any{
+			"admin_key": adminKey,
+		},
+	}
+}
+
 func writeConfig(t *testing.T, address string) string {
 	t.Helper()
 
@@ -443,6 +538,17 @@ func writeDatabaseDriverConfig(t *testing.T, driver string) string {
 
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	content := []byte("database:\n  driver: " + driver + "\n")
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	return path
+}
+
+func writeInstanceConfig(t *testing.T, adminKey string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := []byte("instance:\n  admin_key: " + adminKey + "\n")
 	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}

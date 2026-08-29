@@ -15,18 +15,20 @@ const (
 	DefaultDatabaseDriver = "sqlite"
 	DefaultDatabaseDSN    = "go-template.db"
 
-	envPrefix               = "GO_TEMPLATE"
-	serveAddressConfigKey   = "serve.address"
-	databaseDriverConfigKey = "database.driver"
-	databaseDSNConfigKey    = "database.dsn"
-	serveAddressFlagName    = "address"
-	databaseDriverFlagName  = "database-driver"
-	databaseDSNFlagName     = "database-dsn"
+	envPrefix                 = "GO_TEMPLATE"
+	serveAddressConfigKey     = "serve.address"
+	databaseDriverConfigKey   = "database.driver"
+	databaseDSNConfigKey      = "database.dsn"
+	instanceAdminKeyConfigKey = "instance.admin_key"
+	serveAddressFlagName      = "address"
+	databaseDriverFlagName    = "database-driver"
+	databaseDSNFlagName       = "database-dsn"
 )
 
 type Config struct {
 	Serve    Serve    `mapstructure:"serve"`
 	Database Database `mapstructure:"database"`
+	Instance Instance `mapstructure:"instance"`
 }
 
 type Serve struct {
@@ -36,6 +38,10 @@ type Serve struct {
 type Database struct {
 	Driver string `mapstructure:"driver"`
 	DSN    string `mapstructure:"dsn"`
+}
+
+type Instance struct {
+	AdminKey string `mapstructure:"admin_key"`
 }
 
 type Options struct {
@@ -49,7 +55,10 @@ func (c Config) Validate() error {
 	if err := c.Serve.Validate(); err != nil {
 		return err
 	}
-	return c.Database.Validate()
+	if err := c.Database.Validate(); err != nil {
+		return err
+	}
+	return c.Instance.Validate()
 }
 
 func (c Serve) Validate() error {
@@ -73,11 +82,21 @@ func (c Database) Validate() error {
 	return nil
 }
 
+func (c Instance) Validate() error {
+	if strings.TrimSpace(c.AdminKey) == "" {
+		return fmt.Errorf("%s is required", instanceAdminKeyConfigKey)
+	}
+	return nil
+}
+
 func Load(opts Options) (Config, error) {
 	v := viper.New()
 	v.SetDefault(serveAddressConfigKey, DefaultServeAddress)
 	v.SetDefault(databaseDriverConfigKey, DefaultDatabaseDriver)
 	v.SetDefault(databaseDSNConfigKey, DefaultDatabaseDSN)
+	if err := v.BindEnv(instanceAdminKeyConfigKey); err != nil {
+		return Config{}, fmt.Errorf("bind instance admin key environment: %w", err)
+	}
 
 	if err := v.MergeConfigMap(opts.KV); err != nil {
 		return Config{}, fmt.Errorf("merge kv configuration: %w", err)

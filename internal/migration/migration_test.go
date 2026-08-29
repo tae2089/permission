@@ -9,7 +9,7 @@ import (
 	"github.com/tae2089/go-template/internal/database"
 )
 
-func TestRunAppliesUserSchema(t *testing.T) {
+func TestRunAppliesFeatureSchemas(t *testing.T) {
 	ctx := context.Background()
 	dsn := filepath.Join(t.TempDir(), "migration.db")
 	cfg := config.Config{
@@ -37,5 +37,11 @@ func TestRunAppliesUserSchema(t *testing.T) {
 	})
 	if !connection.DB().Migrator().HasTable("users") {
 		t.Error("users table does not exist after migration")
+	}
+	if !connection.DB().Migrator().HasTable("projects") {
+		t.Error("projects table does not exist after migration")
+	}
+	if !connection.DB().Migrator().HasTable("audit_events") {
+		t.Error("audit_events table does not exist after migration")
 	}
 }

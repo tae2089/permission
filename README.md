@@ -20,6 +20,8 @@ runs.
 - Explicit route composition without global registries
 - GORM with an explicitly owned SQLite connection
 - Example User creation vertical slice
+- Project bootstrap with instance-administrator Bearer authentication and
+  transactional audit records
 - Explicit database migrations
 - AST-enforced architecture boundaries
 - No global mutable Cobra or Viper state
@@ -55,10 +57,12 @@ internal/health/      liveness HTTP handler and route registration
 internal/http/errors/ HTTP error classification and safe response types
 internal/http/input/  bounded JSON, XML, and form request decoding
 internal/http/middleware/ Global errors, recovery, tracing, and logging
+internal/audit/       shared management-audit event persistence
 internal/migration/   explicit feature schema migration runtime
 internal/server/      Gin engine, middleware, and top-level route composition
 internal/telemetry/   OpenTelemetry provider, propagation, and lifecycle
 internal/user/        example Handler-Service-Repository vertical slice
+internal/project/     Project bootstrap and atomic audit integration
 scripts/architecture/ dependency and explicit-registration architecture checker
 docs/                 development, architecture, domain, and configuration guidance
 ```
@@ -92,6 +96,19 @@ normalization, duplicate handling, and allowed behavior are defined in
 This endpoint reports process liveness only. It does not check databases,
 queues, or other external dependencies.
 
+## Project Bootstrap
+
+`POST /v1/projects` creates a Project when called with the instance
+administrator credential. `GET /v1/projects` lists them. Both endpoints require
+`Authorization: Bearer <instance administrator key>`. Project creation writes a
+`project.created` audit event in the same database transaction.
+
+```json
+{"name":"billing-api"}
+```
+
+Names must match `^[a-z0-9-]{1,63}$`.
+
 ## Configuration
 
 The canonical file format is YAML:
@@ -112,7 +129,7 @@ Apply the schema, then run the template locally:
 
 ```sh
 go run ./cmd/app migrate --config config.example.yaml
-go run ./cmd/app serve --config config.example.yaml
+GO_TEMPLATE_INSTANCE_ADMIN_KEY=<secret> go run ./cmd/app serve --config config.example.yaml
 ```
 
 ## Verification

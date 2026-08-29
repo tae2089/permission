@@ -117,6 +117,58 @@ An invalid name or empty email returns `400 bad_request`. An email that
 normalizes to an existing User returns `409 already_exists`. The Handler does
 not translate those errors itself.
 
+## Project Bootstrap
+
+Project bootstrap endpoints require the instance administrator credential:
+
+```text
+Authorization: Bearer <instance administrator key>
+```
+
+The key is configured by `instance.admin_key`. A missing, malformed, or invalid
+credential returns `401 unauthenticated` with the standard fixed public
+message. The response never identifies which part of the credential failed.
+
+`POST /v1/projects` accepts strict JSON:
+
+```json
+{
+  "name": "billing-api"
+}
+```
+
+`name` must match `^[a-z0-9-]{1,63}$`. On success it returns `201 Created`,
+sets `Location: /v1/projects/<uuid>`, and returns:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "billing-api",
+  "created_at": "2026-08-29T10:00:00Z"
+}
+```
+
+An invalid request body or name returns `400 bad_request`. Creation persists the
+Project and its `project.created` audit event atomically; an internal storage
+failure returns the standard `500 internal` response and creates neither row.
+
+`GET /v1/projects` returns `200 OK`:
+
+```json
+{
+  "projects": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "billing-api",
+      "created_at": "2026-08-29T10:00:00Z"
+    }
+  ]
+}
+```
+
+Projects are ordered by `created_at` ascending, then `id` ascending. The empty
+result is `{"projects":[]}`.
+
 ## Error Flow
 
 Create an `internal/apperr` error where the application meaning becomes known.

@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
+	"github.com/tae2089/go-template/internal/apikey"
 	"github.com/tae2089/go-template/internal/health"
 	"github.com/tae2089/go-template/internal/http/middleware"
 	"github.com/tae2089/go-template/internal/project"
@@ -19,6 +20,7 @@ func New(
 	healthHandler *health.Handler,
 	userHandler *user.Handler,
 	projectHandler *project.Handler,
+	apiKeyHandler *apikey.Handler,
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(
@@ -35,6 +37,9 @@ func New(
 	health.RegisterRoutes(router.Group("/healthz"), healthHandler)
 	user.RegisterRoutes(router.Group("/users"), userHandler)
 	project.RegisterRoutes(router.Group("/v1/projects"), projectHandler)
+	if apiKeyHandler != nil {
+		apikey.RegisterRoutes(router.Group("/v1"), apiKeyHandler)
+	}
 
 	return router
 }

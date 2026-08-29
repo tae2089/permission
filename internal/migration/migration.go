@@ -6,6 +6,7 @@ import (
 
 	"github.com/tae2089/trace/v3"
 
+	"github.com/tae2089/go-template/internal/apikey"
 	"github.com/tae2089/go-template/internal/audit"
 	"github.com/tae2089/go-template/internal/config"
 	"github.com/tae2089/go-template/internal/database"
@@ -28,6 +29,9 @@ func Run(ctx context.Context, cfg config.Config) error {
 	}
 	if migrateErr == nil {
 		migrateErr = project.Migrate(ctx, connection.DB())
+	}
+	if migrateErr == nil {
+		migrateErr = apikey.Migrate(ctx, connection.DB())
 	}
 	if migrateErr != nil {
 		migrateErr = trace.Wrap(migrateErr, "apply database migrations")

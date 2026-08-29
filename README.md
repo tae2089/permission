@@ -63,6 +63,7 @@ internal/server/      Gin engine, middleware, and top-level route composition
 internal/telemetry/   OpenTelemetry provider, propagation, and lifecycle
 internal/user/        example Handler-Service-Repository vertical slice
 internal/project/     Project bootstrap and atomic audit integration
+internal/apikey/      Project-scoped API-key issuance, rotation, revocation, and audit integration
 scripts/architecture/ dependency and explicit-registration architecture checker
 docs/                 development, architecture, domain, and configuration guidance
 ```
@@ -108,6 +109,12 @@ administrator credential. `GET /v1/projects` lists them. Both endpoints require
 ```
 
 Names must match `^[a-z0-9-]{1,63}$`.
+
+## Project API Keys
+
+An instance administrator can issue an initial `project_admin` key. That key
+then manages `project_admin` and `decision` keys only for its own Project.
+Raw secrets are returned once, while only verification hashes are stored.
 
 ## Configuration
 

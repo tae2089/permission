@@ -37,8 +37,21 @@ UUID, immutable name, and creation timestamp.
 
 - Avoid: tenant, account, organization
 - Related: Audit Event
-- Notes: Project names are not unique in this initial slice. Tenant and Project
-  API keys are separate future concepts.
+- Notes: Project names are not unique. Project API keys are always scoped to
+  exactly one Project.
+
+### Project API Key
+
+An opaque machine credential scoped to one Project. It is either a
+`project_admin` key, which manages keys for its own Project, or a `decision`
+key, reserved for future permission-decision requests.
+
+- The raw secret is returned only when issued or rotated; only its verification
+  hash is persisted.
+- A Project and key kind may have at most two active keys, so clients can
+  deploy a replacement before explicitly revoking the former key.
+- Revocation is immediate and leaves immutable audit evidence. There is no
+  automatic expiry in this slice.
 
 ### Audit Event
 

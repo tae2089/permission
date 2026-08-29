@@ -42,7 +42,7 @@ func TestRouterServesHealthCheck(t *testing.T) {
 			return uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"), nil
 		},
 	)
-	router := New(logger, provider, health.NewHandler(), user.NewHandler(userService), newProjectHandler())
+	router := New(logger, provider, health.NewHandler(), user.NewHandler(userService), newProjectHandler(), nil)
 	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	response := httptest.NewRecorder()
 
@@ -127,6 +127,7 @@ func TestRouterCreatesUserThroughSQLite(t *testing.T) {
 		health.NewHandler(),
 		user.NewHandler(service),
 		newProjectHandler(),
+		nil,
 	)
 	request := httptest.NewRequest(
 		http.MethodPost,
@@ -226,6 +227,7 @@ func TestRouterCreatesProjectAndAuditEventThroughSQLite(t *testing.T) {
 		health.NewHandler(),
 		user.NewHandler(user.NewService(stubRepository{}, uuid.NewRandom)),
 		project.NewHandler(projectService, "test-instance-admin-key"),
+		nil,
 	)
 	request := httptest.NewRequest(
 		http.MethodPost,

@@ -169,6 +169,22 @@ failure returns the standard `500 internal` response and creates neither row.
 Projects are ordered by `created_at` ascending, then `id` ascending. The empty
 result is `{"projects":[]}`.
 
+## Project API Keys
+
+`POST /v1/projects/<project-id>/api-keys` issues an opaque key. An instance
+administrator may issue only the initial or recovery `project_admin` key; a
+Project administrator key may issue either `project_admin` or `decision` for
+its own Project. The request is strict JSON containing `{"kind":"project_admin"}`
+or `{"kind":"decision"}`. A successful `201 Created` response contains the
+public key metadata and `secret`; that raw value is never returned again.
+
+`GET /v1/projects/<project-id>/api-keys` returns metadata only. A Project
+administrator cannot read another Project's keys. `POST .../<key-id>/rotate`
+issues a second active key of the same kind, and `POST .../<key-id>/revoke`
+returns `204 No Content` and rejects that key immediately. There may be at most
+two active keys of one kind per Project; exceeding the limit returns `429
+limit_exceeded`. Every successful management change records an audit event.
+
 ## Error Flow
 
 Create an `internal/apperr` error where the application meaning becomes known.

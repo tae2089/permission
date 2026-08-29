@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/tae2089/go-template/internal/apikey"
 	"github.com/tae2089/go-template/internal/audit"
 	"github.com/tae2089/go-template/internal/config"
 	"github.com/tae2089/go-template/internal/database"
@@ -51,12 +52,15 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	auditWriter := audit.NewWriter()
 	projectRepository := project.NewRepository(connection.DB(), auditWriter)
 	projectService := project.NewService(projectRepository, uuid.NewRandom, time.Now)
+	apiKeyRepository := apikey.NewRepository(connection.DB(), auditWriter)
+	apiKeyService := apikey.NewService(apiKeyRepository)
 	router := New(
 		logger,
 		provider,
 		health.NewHandler(),
 		user.NewHandler(userService),
 		project.NewHandler(projectService, cfg.Instance.AdminKey),
+		apikey.NewHandler(apiKeyService, cfg.Instance.AdminKey),
 	)
 	logger.InfoContext(ctx, "server starting", "address", cfg.Serve.Address)
 

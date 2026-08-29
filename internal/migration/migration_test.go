@@ -44,4 +44,7 @@ func TestRunAppliesFeatureSchemas(t *testing.T) {
 	if !connection.DB().Migrator().HasTable("audit_events") {
 		t.Error("audit_events table does not exist after migration")
 	}
+	if !connection.DB().Migrator().HasTable("api_keys") {
+		t.Error("api_keys table does not exist after migration")
+	}
 }

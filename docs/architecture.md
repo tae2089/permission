@@ -25,6 +25,8 @@ It also selects Gin for HTTP routing and defines the first feature boundary:
 - `POST /users` demonstrates a complete Handler -> Service -> Repository slice.
 - `POST /v1/projects` and `GET /v1/projects` bootstrap Project management with
   instance-administrator authentication and an atomic audit record.
+- Project-scoped API keys are issued, rotated, revoked, and audited through a
+  separate Handler -> Service -> Repository feature slice.
 
 GORM with SQLite is the selected database adapter. `internal/database` owns
 connection creation, connectivity verification, and close. Features use
@@ -72,6 +74,7 @@ HTTP middleware                      tracing, global errors, recovery, logging
 health.RegisterRoutes                registers GET /healthz
 user.RegisterRoutes                  registers POST /users
 project.RegisterRoutes               registers POST and GET /v1/projects
+apikey.RegisterRoutes                registers Project API-key management routes
 ```
 
 The executable creates a signal context for SIGINT and SIGTERM, then executes
@@ -105,6 +108,7 @@ starts the HTTP runtime.
 | `internal/user` | example User HTTP, use case, invariants, persistence, and migration | server lifecycle, configuration resolution |
 | `internal/audit` | shared management-audit event type, record mapping, Writer, and migration | feature behavior, server lifecycle, HTTP handling |
 | `internal/project` | Project bootstrap HTTP, use case, atomic Project/audit integration, and migration | server lifecycle, configuration resolution, future tenant or policy behavior |
+| `internal/apikey` | Project-scoped API-key HTTP, authorization, hashed persistence, and audit integration | configuration resolution, end-user authentication, permission evaluation |
 
 ## Dependency Direction
 

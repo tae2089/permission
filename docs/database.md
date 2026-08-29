@@ -102,6 +102,7 @@ The Project bootstrap migration is `project.Migrate(ctx, db)` and creates the
 | --- | --- | --- |
 | `projects` | `id`, `name`, `created_at` | UUID primary key, non-null name and creation timestamp |
 | `audit_events` | `id`, `occurred_at`, `action`, `actor`, `project_id`, `target_id` | immutable management-audit row; `project_id` is indexed and `target_id` identifies the changed resource |
+| `api_keys` | `id`, `project_id`, `kind`, `status`, `secret_hash`, `created_at`, `revoked_at` | opaque Project-scoped key; the hash is unique and no raw secret is persisted |
 
 `audit.Writer` owns the common event-to-record mapping. A feature Repository
 receives the concrete Writer and calls `Append` with its active transaction.

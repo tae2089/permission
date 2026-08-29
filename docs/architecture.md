@@ -23,6 +23,8 @@ It also selects Gin for HTTP routing and defines the first feature boundary:
 - route composition is explicit and constructor-driven;
 - `GET /healthz` reports process liveness.
 - `POST /users` demonstrates a complete Handler -> Service -> Repository slice.
+- `POST /v1/projects` and `GET /v1/projects` bootstrap Project management with
+  instance-administrator authentication and an atomic audit record.
 
 GORM with SQLite is the selected database adapter. `internal/database` owns
 connection creation, connectivity verification, and close. Features use
@@ -69,6 +71,7 @@ HTTP middleware                      tracing, global errors, recovery, logging
         v
 health.RegisterRoutes                registers GET /healthz
 user.RegisterRoutes                  registers POST /users
+project.RegisterRoutes               registers POST and GET /v1/projects
 ```
 
 The executable creates a signal context for SIGINT and SIGTERM, then executes
@@ -100,6 +103,8 @@ starts the HTTP runtime.
 | `internal/http/middleware` | global error response, span error recording, recovery, completion logging | provider construction, feature behavior, product rules |
 | `internal/health` | liveness handler and relative route registration | server lifecycle, external dependency readiness |
 | `internal/user` | example User HTTP, use case, invariants, persistence, and migration | server lifecycle, configuration resolution |
+| `internal/audit` | shared management-audit event type, record mapping, Writer, and migration | feature behavior, server lifecycle, HTTP handling |
+| `internal/project` | Project bootstrap HTTP, use case, atomic Project/audit integration, and migration | server lifecycle, configuration resolution, future tenant or policy behavior |
 
 ## Dependency Direction
 
@@ -116,12 +121,16 @@ The HTTP routing dependency is:
 internal/server -> internal/telemetry -> OpenTelemetry SDK
              \-> internal/database -> GORM -> SQLite
              \-> internal/user -> GORM
+             \-> internal/audit -> GORM
+             \-> internal/project -> GORM
                               \-> internal/http/input
              \-> otelgin
              \-> internal/http/middleware
              \-> internal/health
 internal/migration -> internal/database
                   \-> internal/user
+                  \-> internal/audit
+                  \-> internal/project
 internal/http/middleware -> internal/http/errors -> internal/apperr -> Trace v3
 internal/http/middleware -> internal/telemetry -> OpenTelemetry API
 ```
@@ -160,6 +169,16 @@ POST /users
   -> user.Repository.Create
   -> SQLite INSERT
   -> HTTP 201 + Location
+
+POST /v1/projects
+  -> Bearer instance-administrator authentication
+  -> strict JSON input
+  -> project.Handler.Create
+  -> project.Service.Create
+  -> project.Repository.Create
+  -> audit.Writer.Append(active transaction)
+  -> SQLite transaction: INSERT projects + INSERT audit_events
+  -> HTTP 201 + Location + Project JSON
 ```
 
 The default feature request flow is:
@@ -306,8 +325,8 @@ and verifies it with `PingContext`. The returned concrete connection exposes
 `config.Config.Database.DSN` into `database.Options`, passes it to `Open`, and
 closes the result. HTTP handlers and application behavior do not open database
 connections. `internal/migration.Run` opens its own bounded connection for the
-explicit `migrate` command. User schema, Repository, and deferred transaction
-policy are documented in [Database](database.md).
+explicit `migrate` command. User, Audit, and Project schemas, Repositories, and
+the Project audit transaction policy are documented in [Database](database.md).
 
 ## Command Construction
 
@@ -375,5 +394,6 @@ The derived project chooses these only when requirements exist:
 - additional feature services, repositories, models, and migrations;
 - multi-write transaction mechanisms and consistency rules;
 - Outbox delivery and Saga orchestration semantics;
-- authentication, authorization, and non-recovery middleware;
+- authentication beyond the bootstrap instance administrator credential,
+  authorization, and non-recovery middleware;
 - readiness checks beyond process liveness.

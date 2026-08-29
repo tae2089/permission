@@ -22,6 +22,7 @@ func TestRunReturnsListenerErrorAfterStartup(t *testing.T) {
 			Driver: "sqlite",
 			DSN:    "file:server-run-test?mode=memory&cache=shared",
 		},
+		Instance: config.Instance{AdminKey: "test-instance-admin-key"},
 	}, logger)
 	if err == nil {
 		t.Fatal("Run() error = nil, want listener error")

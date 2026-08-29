@@ -2,10 +2,11 @@
 
 ## Purpose
 
-This template includes one example domain slice to demonstrate how product
-language, invariants, HTTP handling, and persistence stay aligned. The example
-defines User creation only; it is not a general identity or authentication
-system.
+This service currently defines an initial Project bootstrap slice alongside the
+template User example. Project is the top-level isolation boundary for the
+future authorization service; this slice does not implement Tenant, Principal,
+Role, Policy, or permission evaluation. It does not own end-user login,
+password, or OIDC authentication.
 
 ## Canonical Terms
 
@@ -29,14 +30,37 @@ lowercase.
 - Notes: uniqueness applies to the normalized value. The example requires a
   non-empty value but intentionally does not define RFC email syntax validation.
 
+### Project
+
+An instance-scoped authorization boundary identified by a server-generated
+UUID, immutable name, and creation timestamp.
+
+- Avoid: tenant, account, organization
+- Related: Audit Event
+- Notes: Project names are not unique in this initial slice. Tenant and Project
+  API keys are separate future concepts.
+
+### Audit Event
+
+An immutable record of a management change. Creating a Project records one
+`project.created` event with actor `instance_admin`, Project scope, and the new
+Project as its target.
+
+- Avoid: request log, decision log
+- Related: Project
+- Notes: audit events never store the administrator credential or authorization
+  header.
+
 ## States and Transitions
 
-User currently has no lifecycle state. The only defined transition is creation:
+The defined creation transitions are:
 
 | Current state | Action | Preconditions | Next state | Observable result |
 | --- | --- | --- | --- | --- |
 | absent | Create User | valid name and non-empty normalized email not already used | created | UUID assigned and User persisted |
 | absent | Create User | normalized email already used | absent | `already_exists`; no new User |
+| absent | Create Project | valid Project name and authenticated instance administrator | created | UUID, timestamp, and `project.created` audit event persisted atomically |
+| absent | Create Project | invalid name, missing credentials, or audit persistence failure | absent | `bad_request`, `unauthenticated`, or internal error; no Project row |
 
 Update, deletion, suspension, and restoration are unresolved and must not be
 implemented without new domain rules.
@@ -64,19 +88,40 @@ implemented without new domain rules.
 - Creation assigns a non-zero UUID before persistence.
 - Clients cannot provide or replace the UUID during creation.
 
+### Project name
+
+- The client supplies an immutable name at creation.
+- It must match `^[a-z0-9-]{1,63}$` exactly.
+- Valid characters are lowercase ASCII letters, digits, and hyphens. Uppercase
+  letters, whitespace, Korean characters, and every other character are
+  rejected.
+- The initial slice deliberately has no Project-name uniqueness invariant.
+
+### Project creation and audit
+
+- Creation assigns a non-zero UUID and a UTC timestamp before persistence.
+- Project creation and its `project.created` audit event are one atomic
+  same-database operation.
+- If the audit record cannot be saved, the Project must not be created.
+
 ## Allowed and Forbidden Behavior
 
 - `POST /users` may create exactly one User for a valid request.
 - Repeated creation with the same normalized email must not create another User.
 - A rejected request must not write a partial User.
+- `POST /v1/projects` may create exactly one Project only for an authenticated
+  instance administrator and valid name.
+- `GET /v1/projects` may list Projects in creation-time order, with UUID as the
+  deterministic tie-breaker.
+- The bootstrap credential authenticates the instance administrator only; it is
+  not a Project API key and is never persisted in a Project or audit record.
 - HTTP DTOs, GORM records, database errors, and Gin contexts are not domain
   concepts and must not define new domain behavior.
-- Authentication and authorization are intentionally absent from this example;
-  adding either requires a separate contract.
 
 ## Verification
 
-Handler tests cover the HTTP boundary, Service tests cover every invariant, and
-Repository tests cover persistence and unique-email enforcement with real
-SQLite. Any new state, transition, or invariant requires allowed and rejected
+Handler tests cover the HTTP boundary and administrator authentication; Service
+tests cover Project naming and audit-event construction; Repository tests cover
+real SQLite persistence, ordering, and transaction rollback when audit storage
+fails. Any new state, transition, or invariant requires allowed and rejected
 tests before implementation.

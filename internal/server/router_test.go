@@ -8,12 +8,15 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/tae2089/go-template/internal/audit"
 	"github.com/tae2089/go-template/internal/database"
 	"github.com/tae2089/go-template/internal/health"
 	httperrors "github.com/tae2089/go-template/internal/http/errors"
+	"github.com/tae2089/go-template/internal/project"
 	"github.com/tae2089/go-template/internal/telemetry"
 	"github.com/tae2089/go-template/internal/user"
 )
@@ -39,7 +42,7 @@ func TestRouterServesHealthCheck(t *testing.T) {
 			return uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"), nil
 		},
 	)
-	router := New(logger, provider, health.NewHandler(), user.NewHandler(userService))
+	router := New(logger, provider, health.NewHandler(), user.NewHandler(userService), newProjectHandler())
 	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	response := httptest.NewRecorder()
 
@@ -123,6 +126,7 @@ func TestRouterCreatesUserThroughSQLite(t *testing.T) {
 		provider,
 		health.NewHandler(),
 		user.NewHandler(service),
+		newProjectHandler(),
 	)
 	request := httptest.NewRequest(
 		http.MethodPost,
@@ -183,4 +187,87 @@ func TestRouterCreatesUserThroughSQLite(t *testing.T) {
 	if count != 1 {
 		t.Errorf("created user count = %d, want 1", count)
 	}
+}
+
+func TestRouterCreatesProjectAndAuditEventThroughSQLite(t *testing.T) {
+	ctx := context.Background()
+	connection, err := database.Open(ctx, database.Options{
+		Driver: database.DriverSQLite,
+		DSN:    "file:" + uuid.NewString() + "?mode=memory&cache=shared",
+	})
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := connection.Close(); err != nil {
+			t.Errorf("close database: %v", err)
+		}
+	})
+	if err := audit.Migrate(ctx, connection.DB()); err != nil {
+		t.Fatalf("migrate audit events: %v", err)
+	}
+	if err := project.Migrate(ctx, connection.DB()); err != nil {
+		t.Fatalf("migrate projects: %v", err)
+	}
+
+	provider, err := telemetry.New(telemetry.Options{ServiceName: "test-service"})
+	if err != nil {
+		t.Fatalf("create telemetry provider: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := provider.Shutdown(context.Background()); err != nil {
+			t.Errorf("shutdown telemetry provider: %v", err)
+		}
+	})
+	projectService := project.NewService(project.NewRepository(connection.DB(), audit.NewWriter()), uuid.NewRandom, time.Now)
+	router := New(
+		slog.New(slog.DiscardHandler),
+		provider,
+		health.NewHandler(),
+		user.NewHandler(user.NewService(stubRepository{}, uuid.NewRandom)),
+		project.NewHandler(projectService, "test-instance-admin-key"),
+	)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/projects",
+		strings.NewReader(`{"name":"billing-api"}`),
+	)
+	request.Header.Set("Authorization", "Bearer test-instance-admin-key")
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status code = %d, want %d: %s", response.Code, http.StatusCreated, response.Body.String())
+	}
+	var projectCount int64
+	if err := connection.DB().Table("projects").Count(&projectCount).Error; err != nil {
+		t.Fatalf("count projects: %v", err)
+	}
+	if projectCount != 1 {
+		t.Errorf("project count = %d, want 1", projectCount)
+	}
+	var auditEventCount int64
+	if err := connection.DB().Table("audit_events").Where("action = ?", "project.created").Count(&auditEventCount).Error; err != nil {
+		t.Fatalf("count project audit events: %v", err)
+	}
+	if auditEventCount != 1 {
+		t.Errorf("project audit event count = %d, want 1", auditEventCount)
+	}
+}
+
+func newProjectHandler() *project.Handler {
+	service := project.NewService(projectStubRepository{}, uuid.NewRandom, time.Now)
+	return project.NewHandler(service, "test-instance-admin-key")
+}
+
+type projectStubRepository struct{}
+
+func (projectStubRepository) Create(context.Context, project.Project, audit.Event) error {
+	return nil
+}
+
+func (projectStubRepository) List(context.Context) ([]project.Project, error) {
+	return nil, nil
 }

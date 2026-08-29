@@ -94,6 +94,22 @@ creates the `users` table with:
 | `name` | non-null normalized User name |
 | `email` | non-null normalized User email with a unique index |
 
+The Project bootstrap migration is `project.Migrate(ctx, db)` and creates the
+`projects` table. The shared management-audit migration is
+`audit.Migrate(ctx, db)` and creates `audit_events`. Both are idempotent:
+
+| Table | Important columns | Contract |
+| --- | --- | --- |
+| `projects` | `id`, `name`, `created_at` | UUID primary key, non-null name and creation timestamp |
+| `audit_events` | `id`, `occurred_at`, `action`, `actor`, `project_id`, `target_id` | immutable management-audit row; `project_id` is indexed and `target_id` identifies the changed resource |
+
+`audit.Writer` owns the common event-to-record mapping. A feature Repository
+receives the concrete Writer and calls `Append` with its active transaction.
+`project.Repository.Create` therefore persists the Project and its audit event
+in one GORM transaction. If either insert fails, the transaction rolls back.
+The Service defines the paired-write requirement; persistence adapters own the
+GORM transaction so GORM remains outside application code.
+
 A new feature with persisted records must expose an idempotent migration and
 register it explicitly in `internal/migration.Run`. Do not use package `init`,
 automatic discovery, or migration as a side effect of Repository construction.
@@ -117,10 +133,9 @@ automatic discovery, or migration as a side effect of Repository construction.
 - Do not put domain behavior in GORM hooks or callbacks.
 
 The example Create User use case performs one insert and requires no custom
-transaction seam. A future use case with multiple atomic writes must define the
-transaction boundary at the Service/use-case level while keeping `*gorm.DB`
-inside persistence adapters. Do not smuggle a transaction through
-`context.Context`.
+transaction seam. A multi-write use case must define its atomicity contract at
+the Service/use-case level while keeping `*gorm.DB` inside persistence adapters.
+Do not smuggle a transaction through `context.Context`.
 
 ## Deliberately Undecided
 

@@ -18,7 +18,12 @@ func TestServeCompletesValidatesAndRuns(t *testing.T) {
 		return nil
 	})
 
-	if err := serve.Complete(config.Options{FlagSet: flags}); err != nil {
+	if err := serve.Complete(config.Options{
+		FlagSet: flags,
+		Overrides: map[string]any{
+			"instance.admin_key": "test-instance-admin-key",
+		},
+	}); err != nil {
 		t.Fatalf("Complete() error = %v", err)
 	}
 	if err := serve.Validate(); err != nil {

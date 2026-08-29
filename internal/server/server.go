@@ -11,9 +11,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/tae2089/go-template/internal/audit"
 	"github.com/tae2089/go-template/internal/config"
 	"github.com/tae2089/go-template/internal/database"
 	"github.com/tae2089/go-template/internal/health"
+	"github.com/tae2089/go-template/internal/project"
 	"github.com/tae2089/go-template/internal/telemetry"
 	"github.com/tae2089/go-template/internal/user"
 )
@@ -46,7 +48,16 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	userRepository := user.NewRepository(connection.DB())
 	userService := user.NewService(userRepository, uuid.NewRandom)
-	router := New(logger, provider, health.NewHandler(), user.NewHandler(userService))
+	auditWriter := audit.NewWriter()
+	projectRepository := project.NewRepository(connection.DB(), auditWriter)
+	projectService := project.NewService(projectRepository, uuid.NewRandom, time.Now)
+	router := New(
+		logger,
+		provider,
+		health.NewHandler(),
+		user.NewHandler(userService),
+		project.NewHandler(projectService, cfg.Instance.AdminKey),
+	)
 	logger.InfoContext(ctx, "server starting", "address", cfg.Serve.Address)
 
 	serveErr := ListenAndServe(ctx, cfg.Serve.Address, router)

@@ -44,6 +44,7 @@ remote KV adapter is still selected only when a provider is required.
 | `serve.address` | `Config.Serve.Address` | `--address` | `GO_TEMPLATE_SERVE_ADDRESS` | `serve.address` | `:8080` |
 | `database.driver` | `Config.Database.Driver` | `--database-driver` | `GO_TEMPLATE_DATABASE_DRIVER` | `database.driver` | `sqlite` |
 | `database.dsn` | `Config.Database.DSN` | `--database-dsn` | `GO_TEMPLATE_DATABASE_DSN` | `database.dsn` | `go-template.db` |
+| `instance.admin_key` | `Config.Instance.AdminKey` | — | `GO_TEMPLATE_INSTANCE_ADMIN_KEY` | `instance.admin_key` | none (required for `serve`) |
 
 The dotted canonical key is the source of truth. Environment names use the
 `GO_TEMPLATE_` prefix and replace dots or hyphens with underscores.
@@ -57,7 +58,8 @@ stages succeed.
 
 `options.Migrate` uses the same completion and runner sequence but validates
 only `Config.Database`. An invalid or unused `serve.address` must not prevent an
-explicit database migration.
+explicit database migration. `instance.admin_key` is likewise not required for
+`migrate`, because migration does not expose an HTTP administrator endpoint.
 
 `serve.address` must use a TCP `host:port` form with a decimal port from `0` to
 `65535`:
@@ -82,6 +84,11 @@ DSN for the selected driver by `internal/database`. The SQLite default is a
 database file relative to the process working directory. A DSN may contain
 sensitive data; never log it.
 
+`instance.admin_key` must not be empty or whitespace-only when running `serve`.
+It authenticates the bootstrap instance administrator. Treat it as a secret:
+prefer the environment or a secret-managed configuration file, and never log,
+return, or commit its value.
+
 ## Supported Inputs
 
 ### YAML Configuration File
@@ -105,6 +112,7 @@ also an error.
 GO_TEMPLATE_SERVE_ADDRESS=:8081 app serve
 GO_TEMPLATE_DATABASE_DRIVER=sqlite app serve
 GO_TEMPLATE_DATABASE_DSN=local.db app serve
+GO_TEMPLATE_INSTANCE_ADMIN_KEY=<secret> app serve
 ```
 
 ### Flags
@@ -132,6 +140,9 @@ map[string]any{
 		"driver": "sqlite",
 		"dsn":    "local.db",
 	},
+	"instance": map[string]any{
+		"admin_key": "provided-by-secret-management",
+	},
 }
 ```
 
@@ -149,6 +160,7 @@ config.Options{
 		"serve.address": ":8084",
 		"database.driver": "sqlite",
 		"database.dsn":    "local.db",
+		"instance.admin_key": "provided-by-secret-management",
 	},
 }
 ```
@@ -160,7 +172,7 @@ environment parsing mechanism.
 
 1. Choose one dotted canonical key.
 2. Add its typed field and `mapstructure` tag to `config.Config`.
-3. Add its default in `config.Load`.
+3. Add its default in `config.Load`, or document why it has no default.
 4. Bind any flag to the canonical key and define its environment mapping.
 5. Add the YAML/KV shape and every public source name to the mapping table.
 6. Extend precedence tests so every supported source participates.

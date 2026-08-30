@@ -1,13 +1,19 @@
-# Go Template
+# Permission Service Foundation
 
-An opinionated Go service template designed for predictable development by both
-humans and coding agents.
+An opinionated Go foundation for a multi-project authorization service. It lets
+instance administrators create Project isolation boundaries, manage
+Project-scoped API keys, and record management changes in a durable audit log.
 
-The template uses a Cobra command tree with `serve` and `migrate` subcommands.
+This is an early authorization slice, not a complete permission system. It does
+not yet define Tenants, Principals, Roles, Policies, or permission-decision
+evaluation, and it does not provide end-user login, password, or OIDC
+authentication. The User vertical slice remains an implementation example.
+
+The service uses a Cobra command tree with `serve` and `migrate` subcommands.
 Configuration is resolved by Viper into typed Go values before application code
 runs.
 
-## Design
+## Implementation Principles
 
 - Thin executable boundary
 - Constructor-based Cobra commands
@@ -19,7 +25,7 @@ runs.
 - Structured `slog` request completion logging
 - Explicit route composition without global registries
 - GORM with an explicitly owned SQLite connection
-- Example User creation vertical slice
+- User creation vertical slice as an implementation example
 - Project bootstrap with instance-administrator Bearer authentication and
   transactional audit records
 - Explicit database migrations
@@ -30,7 +36,7 @@ runs.
 See [Feature development](docs/feature-development.md),
 [Architecture](docs/architecture.md), [Configuration](docs/configuration.md),
 [HTTP API Contract](docs/http.md), and [Database](docs/database.md) before
-extending the template.
+extending the service.
 
 ## Documentation
 
@@ -74,7 +80,7 @@ creates the database connection, telemetry provider, health handler, and
 router, then starts the HTTP server. SIGINT and SIGTERM
 trigger graceful HTTP shutdown.
 
-## Example User Slice
+## User Example Slice
 
 `POST /users` accepts:
 
@@ -132,7 +138,7 @@ Copy [config.example.yaml](config.example.yaml) when creating a local
 configuration file. The complete source mapping and precedence contract live in
 [docs/configuration.md](docs/configuration.md).
 
-Apply the schema, then run the template locally:
+Apply the schema, then run the service locally:
 
 ```sh
 go run ./cmd/app migrate --config config.example.yaml
@@ -152,5 +158,6 @@ The target checks formatting without rewriting files, runs the architecture
 checker, executes uncached tests with and without the race detector, runs
 `go vet`, and rejects reachable known vulnerabilities.
 
-The module currently uses `github.com/tae2089/go-template`. Change the module
-path when creating a repository under a different GitHub owner or name.
+The module path currently retains its template origin:
+`github.com/tae2089/go-template`. Update it when this repository adopts its
+final module path.

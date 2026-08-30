@@ -43,6 +43,7 @@ extending the service.
 | Document | Canonical responsibility |
 | --- | --- |
 | [Agent guide](AGENTS.md) | Required reading order and non-negotiable repository rules |
+| [Contributing](CONTRIBUTING.md) | Pull Request requirements, issue linkage, and completion policy |
 | [Feature development](docs/feature-development.md) | Contract-first vertical-slice implementation workflow and completion gates |
 | [Development conventions](docs/development.md) | Naming, formatting, imports, errors, logging, concurrency, and tests |
 | [Architecture](docs/architecture.md) | Module boundaries, dependency direction, and data flow |
